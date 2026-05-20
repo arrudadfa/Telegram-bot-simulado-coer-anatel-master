@@ -12,7 +12,6 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     PollAnswerHandler,
-    TypeHandler,
 )
 
 
@@ -244,10 +243,6 @@ async def placar_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(format_score_message(user_data))
 
 
-async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.info("Update recebido: %s", update.to_dict())
-
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("Excecao ao processar update %s", update, exc_info=context.error)
 
@@ -316,7 +311,6 @@ def build_app(token: str) -> Application:
     app.add_handler(CommandHandler("legislacao", make_category_handler("legislacao")))
     app.add_handler(CommandHandler("operacional", make_category_handler("operacional")))
     app.add_handler(PollAnswerHandler(poll_answer_handler))
-    app.add_handler(TypeHandler(Update, log_update), group=-1)
     app.add_error_handler(error_handler)
     return app
 
@@ -329,9 +323,22 @@ def main() -> None:
             "Variavel TELEGRAM_BOT_TOKEN nao definida. Configure no ambiente antes de executar."
         )
 
+    webhook_url = os.getenv("WEBHOOK_URL", "").strip()
+    port = int(os.getenv("PORT", "8080"))
+
     app = build_app(token)
-    logger.info("Bot iniciado. Pressione Ctrl+C para encerrar.")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    if webhook_url:
+        logger.info("Bot iniciado em modo webhook: %s", webhook_url)
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=token,
+            webhook_url=f"{webhook_url}/{token}",
+        )
+    else:
+        logger.info("Bot iniciado em modo polling (desenvolvimento local).")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
